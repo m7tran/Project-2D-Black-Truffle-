@@ -1,0 +1,174 @@
+---
+title: "Project 2D: Submit Final R Notebook"
+output: html_notebook
+---
+
+## Introdruction 
+Scientific Question: Is it possible that the black Perigord truffle (Tuber melanosporum) and the Chinese black truffle (Tuber indicum) share similar protein expression profiles responsible for the production of the aromatic flavors such as 2 methylbutane?
+  Black Truffle is a highly prized food today, with its unique scent (aroma) and texture. Howerver, Black Truffle remains relatively poorly studied, lacking “omics” information to
+characterize its biology and biochemistry (Tawhidul Islam). This rare ‘black diamond’ of the kitchen has long intrigued distinguished chefs and biologists alike, due to its combination of smooth texture, pungent odor/perfume, and musty earthy flavor (Mohamedali). A very rare and tresured Black Truffle is the Black Perigord Truffle. Closely related and commonly confused with perigord truffle is the Chinese Black Truffle. The European species Tuber melanosporum and the Asian species T. indicum are phylogenetically and morphologically very close (Chen). With interest in comparing (similarities/differences) of these two kinds of Black Truffle in their cost and aroma we will look into the properties they may be responsible for their aroma. As they are commonly confused as being the same kind of truffle it is possible that the Black Perigord Truffle and the Chinese Black Truffle have similar proteins involved in its aroma based on how they are similar species morphologically/physically. Thus, our scientific question focueses on the possibility of matching the enzyme 2 methylbutance for these two kinds of truffle. 
+
+Scientific Hypothesis: If the black Perigord truffle and the Chinese black truffle share similar protein expression profiles for their aromatic flavors, then volatiles and enzymes such as 2 methylbutane can be matched to the proteins obtained from these two truffles.
+  
+Here we perform protein expression analysis, BLAST search and use a volcano plot and phylogenetic clustering to visualize the similarity of the truffle genome/sequence alignment respectively. Protein expression analysis is done to specify how the certain proteins of buth truffles are synthesized, modified, and regulated. BLAST search is done to identify similar regions between the sequences and compare the protein sequences to identify homologues of the two black truffles. A volcano plot and phylogenetic clustering are done to answer the scientific question about similar protein expression profiles of the truffle’s aromatic flavors. 
+
+## Package Descriptions 
+Below is a bit of code that is responsible for loading in all of the necessary packages. Here, I will define the packages and what they are loaded in for. 
+1. Bioconductor: Analysis and comprehension of high-throughput genomic data. Bioconductor software consists of R add-on packages 
+2. Biostrings: Memory efficient string containers, string matching algorithms, and other utilities, for fast manipulation of large biological sequences or sets of sequences.
+3. seqinr: Biological Sequences Retrieval and Analysis. Exploratory data analysis and data visualization for  biological sequence (DNA and protein) data.
+4. DEP: A  statistical tool for testing differential protein expression in quantitative proteomic analysis or differential enrichment 
+5. taxonomizr: contains functions that work with NCBI accessions and taxonomy
+6. rBLAST: A basic local alignment search tool, searching for query sequences in databases.
+7. ggplot2: A R package dedicated to data visualization
+
+Before running the code below, in the console I needed to install the packages using the commands:
+```{r}
+library(BiocManager)
+library(Biostrings)
+```
+```{r}
+library(seqinr)
+```
+```{r}
+library(dplyr)
+
+library(DESeq2)
+```
+
+```{r}
+library(taxonomizr)
+```
+
+```{r}
+library(rBLAST)
+```
+
+```{r}
+library(ggplot2)
+```
+
+
+## Performing Bioinformatics Analyses
+Below, this code is responsible for loading in a fasta file for the two kinds of Truffle. 
+```{r}
+library(seqinr)
+T_melanosporum <- read.fasta(file = "T_melanosporum.fasta")
+T_indicum <- read.fasta(file = "Tuber_Indicum.fasta")
+
+seq <- readRNAStringSet(system.file("examples/RNA_example.fasta",
+                        package="rBLAST"))
+seq
+```
+
+```{r}
+## load a BLAST database (replace db with the location + name of the BLAST DB)
+bl <- blast("T_melanosporum.fasta")
+bl
+```
+
+```{r}
+# The data is provided with the package
+data <- T_melanosporum
+
+# We filter for contaminant proteins and decoy database hits, which are indicated by "+" in the columns "Potential.contaminants" and "Reverse", respectively. 
+data <- filter(data, Reverse != "+", Potential.contaminant != "+")
+```
+
+```{r}
+colnames(data)
+```
+
+```{r}
+data$Gene.names %>% duplicated() %>% any()
+```
+
+```{r}
+# BLAST Search 
+# Setting Variables
+#prepare for a BLAST query
+dna <- readDNAStringSet('T_melanosporum.fasta', format='fastq')
+bl <- blast(db="/usr/share/data/ncbi/nt/nt.fa")
+
+#Run BLAST query
+cl <- predict(bl, dna[1:10])
+
+cl[1:5,]
+#to view first 5 hits
+summary(cl)
+#shows the top QueryID hits and other summary statistics including percent identity, alignment length and mismatches. 
+```
+```{r}
+# BLAST search 
+# Build taxonomizr database
+ibdir='data'
+dir.create(libdir)
+setwd(libdir)
+getNamesAndNodes()
+getAccession2taxid(types=c('nucl_gb'))
+getAccession2taxid()
+system("gunzip *.gz")
+read.accession2taxid(list.files('.','accession2taxid'),'accessionTaxa.sql')
+print(paste('taxonomizr database built and located at', getwd(), sep=' '))
+
+#prepareDatabase('accessionTaxa.sql') #run this somewhere else
+```
+
+```{r}
+# BLAST search 
+# Visualizing BLAST Hits
+cltax=cbind(cl,taxlist) #bind BLAST hits and taxonomy table
+colnames(cltax)
+#ggplot for top hits or percent identity of each family
+ggplot(data=cltax) + 
+  geom_boxplot(aes(x=family, y=Perc.Ident)) + 
+  theme(axis.text.x = element_text(angle=90)) +
+  ylim(c(85,100))
+#Comparing alignment length for each family 
+ggplot(data=cltax) + 
+  geom_boxplot(aes(x=family, y=Alignment.Length)) + 
+  theme(axis.text.x = element_text(angle=90))
+```
+
+```{r}
+# Volcano Plot 
+#Example Volcano Plot - would apply combined Tuber Melonasporum and Tuber Indicum 
+# Download the data from github (click the "raw" button, save as a text file called "results.txt").
+# https://gist.github.com/stephenturner/806e31fce55a8b7175af
+res <- read.table("results.txt", header=TRUE)
+head(res)
+
+# Make a basic volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-2.5,2)))
+
+# Add colored points: red if padj<0.05, orange of log2FC>1, green if both)
+with(subset(res, padj<.05 ), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+with(subset(res, abs(log2FoldChange)>1), points(log2FoldChange, -log10(pvalue), pch=20, col="orange"))
+with(subset(res, padj<.05 & abs(log2FoldChange)>1), points(log2FoldChange, -log10(pvalue), pch=20, col="green"))
+
+# Plot a volcano plot for the contrast "Ubi6 vs Ctrl""
+plot_volcano(dep, contrast = "Tuber_melanosporum_vs_Tuber_Indicum", label_size = 2, add_names = TRUE)
+```
+
+
+```{r}
+# Phylogenetic Clustering 
+# Example - would apply to combined data for Tuber Melanosporum and Tuber Indicum 
+library(RRphylo)
+
+data("DataFelids")
+DataFelids$treefel->treefel
+DataFelids$statefel->statefel
+
+phyloclust(tree=treefel,state=statefel,focal="saber")
+```
+```{r}
+data("T_combined")
+DataFelids$treefel->treefel
+DataFelids$statefel->statefel
+
+phyloclust(tree=treefel,state=statefel,focal="saber")
+```
+
+## Analysis of Results
+With difficulty in coding and loading the correct packages and data, I was unable to plot/visualize my planned bioinformatic analyses. I unsuccessfully perfomred my bioinformtic analyses which I intended to perfrom/include protein expression analysis, BLAST search and use a volcano plot and phylogenetic clustering to visualize the similarity of the truffle genome/sequence alignment respectively. However, if I was able to perfrom this successfully, I would expect to see similarity f the truffle genome/sequence alignment in which the two kinds of truffle also share similar enzymes and volatiles, specifically 2 methylbutane. 2-methyl-butanal is one of the important volatiles produced by truffles. There are differences in the production of 2-methyl-butanal in different truffle specimen, in which the sequences would have considerable variety across the different Truffle species. If I had done this properly, I would expect to see higher production levels of 2 methylbutane in Tuber melanosporum (Black Perigord Truffle) while Tuber Indicum (Chinese Black Truffle) also contains levels of 2 methylbutane but much less that Tuber melanosporum. Therefore, it is also expected that Black Perigord Truffle's enzyme sequences would be the most divergent from Chinese Black Truffle and other types of Truffle as well. 
